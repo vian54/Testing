@@ -7,8 +7,9 @@ import '../services/cashflow_service.dart';
 class JobCard extends StatelessWidget {
   final String jobId;
   final Map<String, dynamic> data;
+  final String userRole;
 
-  JobCard({required this.jobId, required this.data});
+  JobCard({required this.jobId, required this.data, required this.userRole});
 
   @override
   Widget build(BuildContext context) {
@@ -37,25 +38,25 @@ class JobCard extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               SizedBox(height: 12),
-              
+
               Text(
                 data['title'] ?? '',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              
+
               SizedBox(height: 8),
-              
+
               Text(
                 data['description'] ?? '',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: Colors.grey[700]),
               ),
-              
+
               SizedBox(height: 12),
-              
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -67,10 +68,33 @@ class JobCard extends StatelessWidget {
                       color: Colors.green,
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: () => _showJobDetail(context),
-                    child: Text('Apply'),
-                  ),
+                  userRole == 'client'
+                      ? Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(data['status'] ?? 'open'),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            (data['status'] ?? 'open').toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : ElevatedButton(
+                          onPressed: () => _showJobDetail(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade600,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text('Apply'),
+                        ),
                 ],
               ),
             ],
@@ -82,7 +106,7 @@ class JobCard extends StatelessWidget {
 
   void _showJobDetail(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -111,16 +135,16 @@ class JobCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 SizedBox(height: 24),
-                
+
                 Text(
                   data['title'] ?? '',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                
+
                 SizedBox(height: 16),
-                
+
                 Container(
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -142,24 +166,27 @@ class JobCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 SizedBox(height: 16),
-                
+
                 Text(
                   'Description',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 8),
                 Text(data['description'] ?? ''),
-                
+
                 SizedBox(height: 24),
-                
+
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () => _submitProposal(context, authService),
-                    child: Text('Submit Proposal', style: TextStyle(fontSize: 16)),
+                    child: Text(
+                      'Submit Proposal',
+                      style: TextStyle(fontSize: 16),
+                    ),
                   ),
                 ),
               ],
@@ -181,19 +208,21 @@ class JobCard extends StatelessWidget {
     });
 
     // ⭐ Create project immediately (simplified - no approval needed for demo)
-    var projectRef = await FirebaseFirestore.instance.collection('projects').add({
-      'jobId': jobId,
-      'clientId': data['clientId'],
-      'freelancerId': authService.currentUser!.uid,
-      'budget': data['budget'],
-      'status': 'in_progress',
-      'progress': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    var projectRef = await FirebaseFirestore.instance
+        .collection('projects')
+        .add({
+          'jobId': jobId,
+          'clientId': data['clientId'],
+          'freelancerId': authService.currentUser!.uid,
+          'budget': data['budget'],
+          'status': 'in_progress',
+          'progress': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
     // ⭐ Simulate project completion & payment (for demo cashflow)
     await Future.delayed(Duration(seconds: 1));
-    
+
     CashflowService cashflowService = CashflowService();
     await cashflowService.approveProjectAndPay(
       projectId: projectRef.id,
@@ -203,7 +232,7 @@ class JobCard extends StatelessWidget {
     );
 
     Navigator.pop(context);
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Project completed! Payment received!'),
@@ -214,9 +243,26 @@ class JobCard extends StatelessWidget {
 
   String _formatCurrency(dynamic value) {
     double amount = (value ?? 0).toDouble();
-    return amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    );
+    return amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'open':
+        return Colors.green;
+      case 'in_progress':
+        return Colors.blue;
+      case 'completed':
+        return Colors.purple;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }
